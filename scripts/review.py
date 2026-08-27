@@ -1,24 +1,34 @@
 #!/usr/bin/env python3
 """Прогон параграфа книги через обойму редакторов параллельно.
 
-Обойма:
-  - DeepSeek (deepseek-chat)        — фактчек платформы 1С
-  - GPT-5.5  (structure)            — архитектура текста
-  - GPT-5.5  (metaphor)             — устойчивость образов
-  - GPT-5.5  (tone)                 — звучание (опционально, флаг --tone)
-  - Gemini 2.5 Flash                — адверсар + читатель-первокурсник
+Обойма (каждый редактор видит только свою ось — это и есть смысл панели):
+  - DeepSeek (deepseek-chat)   — фактчек платформы 1С
+  - GPT-5.5  (structure)       — архитектура текста, переходы
+  - GPT-5.5  (metaphor)        — устойчивость образов
+  - GPT-5.5  (tone)            — звучание (опционально, флаг --tone)
+  - GPT-5.5  (style)           — стиль и канон (опционально, флаг --style)
+  - Gemini 2.5 Flash           — адверсар + читатель-первокурсник
 
 Usage:
-    python3 scripts/review.py A0
-    python3 scripts/review.py B3.5 --tone
-    python3 scripts/review.py chapters/02_ruki/02-04_pishu_chitayu.md
+    python3 scripts/review.py 2.4            # § по номеру → chapters/*/02-04_*.md
+    python3 scripts/review.py 02-04          # тот же приём, по префиксу файла
+    python3 scripts/review.py chapters/02_semantika/02-04_perevod.md
+    python3 scripts/review.py 2.4 --tone --style
 
-Output: reviews/<label>/{deepseek,gpt55-structure,gpt55-metaphor,gpt55-tone,gemini}.md
+Output: reviews/<label>/{deepseek,gpt55-structure,gpt55-metaphor,...}.md
+Дальше Claude собирает synthesis.md из отчётов.
+
+Требования:
+  - Python 3, .env в корне с ключами:
+      DEEPSEEK_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY
+    (нужны только те ключи, чьи редакторы участвуют в прогоне)
 """
 import os
+import re
 import sys
 import json
 import time
+import glob
 import urllib.request
 import urllib.error
 from pathlib import Path
@@ -28,30 +38,17 @@ from datetime import datetime, timezone
 ROOT = Path(__file__).parent.parent.resolve()
 PROMPTS = ROOT / "scripts" / "prompts"
 REVIEWS = ROOT / "reviews"
+CHAPTERS = ROOT / "chapters"
 
-PARA_MAP = {
-    "A0":   "chapters/01_koncept/01-01_zachem_registr.md",
-    "A1":   "chapters/01_koncept/01-02_registr_v_grammatike.md",
-    "A2":   "chapters/01_koncept/01-03_kryuchok_istorii.md",
-    "A3":   "chapters/01_koncept/01-04_obshchij_skelet.md",
-    "A4":   "chapters/01_koncept/01-05_registry_na_bytovom_domene.md",
-    "B1":   "chapters/02_ruki/02-01_pervyj_zahod_v_konfigurator.md",
-    "B2":   "chapters/02_ruki/02-02_izmerenie_ili_rekvizit.md",
-    "B3":   "chapters/02_ruki/02-03_zapis_provedenie.md",
-    "B3.5": "chapters/02_ruki/02-04_pishu_chitayu.md",
-    "B4":   "chapters/02_ruki/02-05_vyborka_zapros_vt.md",
-    "C1":   "chapters/03_predmetka/03-01_most_vo_vtoroj_domen.md",
-    "C2":   "chapters/03_predmetka/03-02_vtoroj_zahod_rb_rr.md",
-    "C3":   "chapters/03_predmetka/03-03_vybor_registra.md",
-    "C4":   "chapters/03_predmetka/03-04_vybor_na_praktike.md",
-    "C5":   "chapters/03_predmetka/03-05_istoriya_celikom.md",
-}
+# Модель семейства GPT, используется для ролевых редакторов.
+# Переопределяется переменной окружения OPENAI_MODEL.
+GPT_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.5")
 
 
 def load_env():
     env_path = ROOT / ".env"
     if not env_path.exists():
-        sys.exit("Error: .env not found in repo root.")
+        sys.exit("Error: .env не найден в корне репозитория.")
     for line in env_path.read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -136,10 +133,15 @@ def call_gemini(system_prompt, user_content):
     return "".join(p.get("text", "") for p in parts)
 
 
+def read_optional(path):
+    return path.read_text() if path.exists() else ""
+
+
 def build_context(paragraph_text, paragraph_label):
-    constitution  = (ROOT / "spec" / "constitution.md").read_text()
-    specification = (ROOT / "spec" / "specification.md").read_text()
-    claude_md     = (ROOT / "CLAUDE.md").read_text()
+    constitution  = read_optional(ROOT / "spec" / "constitution.md")
+    specification = read_optional(ROOT / "spec" / "specification.md")
+    claude_md     = read_optional(ROOT / "CLAUDE.md")
+    style_guide   = read_optional(ROOT / "docs" / "style-guide.md")
     return f"""# КОНТЕКСТ КНИГИ
 
 ## CLAUDE.md (рабочие соглашения, канон, стиль)
@@ -160,6 +162,12 @@ def build_context(paragraph_text, paragraph_label):
 {specification}
 ```
 
+## docs/style-guide.md (требования к стилю)
+
+```markdown
+{style_guide}
+```
+
 ---
 
 # ПАРАГРАФ НА ПРОВЕРКУ: {paragraph_label}
@@ -175,31 +183,42 @@ def build_context(paragraph_text, paragraph_label):
 
 
 def resolve_path(arg):
-    if arg in PARA_MAP:
-        return PARA_MAP[arg], arg
+    """Принимает: полный/относительный путь, либо § вида '2.4' / '02-04'.
+
+    Для шортката ищет chapters/*/NN-MM_*.md по префиксу.
+    """
+    # 1. Явный путь
     p = Path(arg)
     if not p.is_absolute():
-        p = ROOT / p
-    if not p.exists():
-        sys.exit(
-            f"Error: '{arg}' — нет в шорткатах PARA_MAP и не существует как файл.\n"
-            f"Известные шорткаты: {', '.join(PARA_MAP.keys())}"
-        )
-    rel = p.resolve().relative_to(ROOT).as_posix()
-    for label, mapped in PARA_MAP.items():
-        if mapped == rel:
-            return rel, label
-    return rel, p.stem
+        p_abs = ROOT / p
+    else:
+        p_abs = p
+    if p_abs.exists() and p_abs.is_file():
+        rel = p_abs.resolve().relative_to(ROOT).as_posix()
+        return rel, Path(rel).stem.split("_")[0]
+
+    # 2. Шорткат § — нормализуем '2.4' / '2-4' / '02.04' → '02-04'
+    m = re.fullmatch(r"(\d{1,2})[.\-](\d{1,2})", arg)
+    if m:
+        prefix = f"{int(m.group(1)):02d}-{int(m.group(2)):02d}"
+        matches = sorted(glob.glob(str(CHAPTERS / "*" / f"{prefix}_*.md")))
+        if len(matches) == 1:
+            rel = Path(matches[0]).resolve().relative_to(ROOT).as_posix()
+            return rel, prefix
+        if len(matches) > 1:
+            sys.exit(f"Неоднозначно: '{arg}' → {matches}")
+
+    sys.exit(
+        f"Error: '{arg}' — не файл и не § вида '2.4'.\n"
+        f"Примеры: 2.4 | 02-04 | chapters/02_semantika/02-04_perevod.md"
+    )
 
 
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     flags = {a for a in sys.argv[1:] if a.startswith("--")}
     if not args:
-        sys.exit(
-            f"Usage: {sys.argv[0]} <§ shortcut or path> [--tone]\n"
-            f"Шорткаты: {', '.join(PARA_MAP)}"
-        )
+        sys.exit(f"Usage: {sys.argv[0]} <§ '2.4' | путь> [--tone] [--style]")
     load_env()
 
     rel_path, label = resolve_path(args[0])
@@ -207,36 +226,29 @@ def main():
     paragraph_text = para_file.read_text()
     context = build_context(paragraph_text, f"§{label}  ({rel_path})")
 
-    # Обойма: имя → (callable, описание, имя-файла-вывода)
-    GPT5 = "gpt-5.5"
+    def gpt(role_prompt_file):
+        return lambda: call_openai(
+            GPT_MODEL, (PROMPTS / role_prompt_file).read_text(), context
+        )
 
-    def gpt55_role(role):
-        def f(p): return call_openai(GPT5, p, context)
-        return f
-
+    # Базовая обойма
     editors = {
         "deepseek": (
             lambda: call_deepseek((PROMPTS / "deepseek-fact.md").read_text(), context),
             "DeepSeek — фактчек 1С",
         ),
-        "gpt55-structure": (
-            lambda: gpt55_role("structure")((PROMPTS / "openai-structure.md").read_text()),
-            "GPT-5.5 — структура",
-        ),
-        "gpt55-metaphor": (
-            lambda: gpt55_role("metaphor")((PROMPTS / "openai-metaphor.md").read_text()),
-            "GPT-5.5 — метафоры",
-        ),
+        "gpt55-structure": (gpt("openai-structure.md"), "GPT — структура"),
+        "gpt55-metaphor":  (gpt("openai-metaphor.md"),  "GPT — метафоры"),
         "gemini": (
             lambda: call_gemini((PROMPTS / "gemini-adversary.md").read_text(), context),
             "Gemini — адверсар + читатель",
         ),
     }
+    # Опциональные редакторы
     if "--tone" in flags:
-        editors["gpt55-tone"] = (
-            lambda: gpt55_role("tone")((PROMPTS / "openai-tone.md").read_text()),
-            "GPT-5.5 — тон и ритм",
-        )
+        editors["gpt55-tone"] = (gpt("openai-tone.md"), "GPT — тон и ритм")
+    if "--style" in flags:
+        editors["gpt55-style"] = (gpt("openai-style.md"), "GPT — стиль и канон")
 
     out_dir = REVIEWS / label
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -253,11 +265,11 @@ def main():
             try:
                 results[name] = fut.result()
                 secs = time.monotonic() - t0
-                print(f"  ✓ {lbl:<36} {len(results[name]):>6} симв.  ({secs:.1f}s)")
+                print(f"  ✓ {lbl:<34} {len(results[name]):>6} симв.  ({secs:.1f}s)")
             except Exception as e:
                 err = f"{type(e).__name__}: {e}"
                 results[name] = f"# ОШИБКА вызова\n\n```\n{err[:2000]}\n```\n"
-                print(f"  ✗ {lbl:<36} {err[:80]}")
+                print(f"  ✗ {lbl:<34} {err[:80]}")
 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     for name, content in results.items():
