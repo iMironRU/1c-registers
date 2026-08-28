@@ -2,7 +2,7 @@
 """Эксперимент: прогоняем один параграф через матрицу OpenAI моделей × ролей.
 
 Usage:
-    python3 scripts/experiment_gpt.py A1
+    python3 scripts/experiment_gpt.py 1.2
 
 Output: reviews/<label>-experiment/<model>__<role>.md
 """
