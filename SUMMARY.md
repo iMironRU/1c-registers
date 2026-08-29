@@ -10,9 +10,9 @@
 
 - [✏️ § 1.1. Зачем вообще регистр (пролог) (черновик)](chapters/01_koncept/01-01_zachem_registr.md)
 - [✏️ § 1.2. Регистр в нашей грамматике (черновик)](chapters/01_koncept/01-02_registr_v_grammatike.md)
-- [✏️ § 1.3. Откуда взялись четыре регистра — одной фразой (черновик)](chapters/01_koncept/01-03_kryuchok_istorii.md)
-- [✏️ § 1.4. Общий скелет: измерения, ресурсы, реквизиты (черновик)](chapters/01_koncept/01-04_obshchij_skelet.md)
-- [✏️ § 1.5. Четыре характера на знакомых примерах (черновик)](chapters/01_koncept/01-05_registry_na_bytovom_domene.md)
+- [✏️ § 1.3. Откуда взялись четыре регистра — одной фразой (черновик)](chapters/01_koncept/01-03_otkuda_chetyre.md)
+- [✏️ § 1.4. Общее устройство: измерения, ресурсы, реквизиты (черновик)](chapters/01_koncept/01-04_obshchee_ustrojstvo.md)
+- [✏️ § 1.5. Четыре характера на знакомых примерах (черновик)](chapters/01_koncept/01-05_chetyre_haraktera.md)
 
 ## Модуль 2. Руки: простые регистры
 
@@ -24,7 +24,7 @@
 
 ## Модуль 3. Предметка, выбор и история
 
-- [✏️ § 3.1. Минимум бухгалтерских слов (черновик)](chapters/03_predmetka/03-01_most_vo_vtoroj_domen.md)
+- [✏️ § 3.1. Минимум бухгалтерских слов (черновик)](chapters/03_predmetka/03-01_minimum_buhgalterskih_slov.md)
 - [✏️ § 3.2. Второй заход в конфигуратор — регистр бухгалтерии и регистр расчёта (черновик)](chapters/03_predmetka/03-02_vtoroj_zahod_rb_rr.md)
 - [✏️ § 3.3. Выбор регистра (черновик)](chapters/03_predmetka/03-03_vybor_registra.md)
 - [✏️ § 3.4. Выбор на практике ≠ канон (черновик)](chapters/03_predmetka/03-04_vybor_na_praktike.md)
