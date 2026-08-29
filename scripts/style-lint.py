@@ -42,7 +42,8 @@ DEFAULT_SEVERITY = {
     "emoji": "warning",
     "heavy": "warning",
     "wide": "warning",
-    "kitchen": "error",     # разметки больше четверти объёма
+    "kitchen": "error",
+    "agree": "warning",     # разметки больше четверти объёма
 }
 
 
@@ -291,6 +292,16 @@ def check_file(path, cfg):
                 col = m.start() - text.rfind("\n", 0, m.start())
                 findings.append((level, path, line, col, "kitchen",
                                  f"«{m.group(0).strip()[:26]}» — {why}"))
+
+    # Согласование рода после массовых замен. Проверяем по склеенному тексту:
+    # в исходнике фраза часто разорвана переносом строки, и построчный поиск её
+    # не видит — именно так «один общий устройство» дожил до готового EPUB.
+    if sev("agree") != "off":
+        flat = re.sub(r"\s+", " ", text)
+        AGREE = r"(?<![А-Яа-яЁё])(тот|этот|один|общий|такой|весь|наш|каждый|любой)\s+устройств\w*"
+        for m in re.finditer(AGREE, flat, flags=re.I):
+            findings.append((sev("agree"), path, 1, 1, "agree",
+                             f"«{m.group(0)}» — род не согласован: «устройство» среднего рода"))
 
     # Ширина артефакта. На телефоне в моноширинный блок влезает около 46
     # знаков. Если строка длиннее, читалка её переносит — и правая колонка
