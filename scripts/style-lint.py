@@ -303,7 +303,14 @@ def check_file(path, cfg):
                 continue
             line = raw[:m.start()].count("\n") + 1
             rows = [l for l in block.split("\n") if l.strip()]
-            two_col = sum(1 for l in rows if re.search(r"\S {3,}\S", l)) >= max(2, len(rows) // 2)
+            lang = m.group(1).strip()
+            # У кода отступы и продолжения строк выглядят как колонки, но ими не
+            # являются: с ним поможет только перенос, а не таблица. И у схемы
+            # с ветвлением колонок тоже нет.
+            is_code = lang.startswith("bsl")
+            is_scheme = any(ch in block for ch in "│┌└├┤┬┴┼┐┘↓↑→←⇒▓░")
+            two_col = (not is_code and not is_scheme
+                       and sum(1 for l in rows if re.search(r"\S {3,}\S", l)) >= max(2, len(rows) // 2))
             if two_col:
                 findings.append((sev("wide"), path, line, 1, "wide",
                                  f"две колонки шириной {widest} знаков — на телефоне "
