@@ -45,7 +45,7 @@
 
 | Где | Первая строка | Почему |
 |---|---|---|
-| [chapters/02_ruki/02-01_pervyj_zahod_v_konfigurator.md:243](../chapters/02_ruki/02-01_pervyj_zahod_v_konfigurator.md) | `ЦеныНоменклатуры          ОстаткиТоваров` | parser: Ожидалось «;», получено «ОстаткиТоваров» |
+| [chapters/02_ruki/02-01_pervyj_zahod_v_konfigurator.md:243](../chapters/02_ruki/02-01_pervyj_zahod_v_konfigurator.md) | `ЦеныНоменклатуры          ТоварыНаСкладах` | parser: Ожидалось «;», получено «ТоварыНаСкладах» |
 | [chapters/02_ruki/02-02_izmerenie_ili_rekvizit.md:202](../chapters/02_ruki/02-02_izmerenie_ili_rekvizit.md) | `измерения                            строк в таблице итогов` | lexer: Неизвестный символ «×» |
 | [chapters/02_ruki/02-05_vyborka_zapros_vt.md:85](../chapters/02_ruki/02-05_vyborka_zapros_vt.md) | `Выборка = Результат.Выбрать();` | чистый язык, не хватает контекста: Результат |
 | [chapters/03_predmetka/03-01_most_vo_vtoroj_domen.md:112](../chapters/03_predmetka/03-01_most_vo_vtoroj_domen.md) | `Операция                      Ящик                     Колон` | parser: Ожидалось «;», получено «Ящик» |
