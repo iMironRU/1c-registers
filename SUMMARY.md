@@ -8,9 +8,9 @@
 
 ## Модуль 1. Концепт: что такое регистр
 
-- [✏️ § 1.1. Зачем вообще регистр (пролог) (черновик)](chapters/01_koncept/01-01_zachem_registr.md)
+- [✏️ § 1.1. Зачем вообще регистр (черновик)](chapters/01_koncept/01-01_zachem_registr.md)
 - [✏️ § 1.2. Регистр в нашей грамматике (черновик)](chapters/01_koncept/01-02_registr_v_grammatike.md)
-- [✏️ § 1.3. Откуда взялись четыре регистра — одной фразой (черновик)](chapters/01_koncept/01-03_otkuda_chetyre.md)
+- [✏️ § 1.3. Откуда взялись четыре регистра (черновик)](chapters/01_koncept/01-03_otkuda_chetyre.md)
 - [✏️ § 1.4. Общее устройство: измерения, ресурсы, реквизиты (черновик)](chapters/01_koncept/01-04_obshchee_ustrojstvo.md)
 - [✏️ § 1.5. Четыре характера на знакомых примерах (черновик)](chapters/01_koncept/01-05_chetyre_haraktera.md)
 
